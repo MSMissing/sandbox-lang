@@ -1,1 +1,1 @@
-apple
+print           ("I like trains.")

@@ -1,3 +1,6 @@
+mod lexer;
+mod parser;
+
 use std::env;
 use std::fs;
 
@@ -6,5 +9,11 @@ fn main() {
 	
 	let file = fs::read_to_string(args[1].clone()).unwrap();
 	
-	println!("{}", file);
+	let tokens = lexer::lex(file);
+	
+	println!("{:?}", &tokens);
+	
+	let nodes = parser::parse(tokens);
+	
+	println!("{:?}", &nodes);
 }
