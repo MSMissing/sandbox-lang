@@ -2,10 +2,12 @@
 pub enum Token {
 	None,
 	Print,
+	Exit,
 	Ident(String),
 	OpenParen,
 	CloseParen,
 	StringLit(String),
+	IntLit(i64),
 }
 
 fn lex_keyword(i: &mut usize, code_bytes: &[u8]) -> Token {
@@ -16,6 +18,7 @@ fn lex_keyword(i: &mut usize, code_bytes: &[u8]) -> Token {
 	}
 	return match String::from_utf8(keyword.clone()).unwrap().as_str() {
 		"print" => Token::Print,
+		"exit" => Token::Exit,
 		_ => Token::Ident(String::from_utf8(keyword).unwrap())
 	};
 }
@@ -30,14 +33,25 @@ fn lex_string(i: &mut usize, code_bytes: &[u8]) -> String {
 	return String::from_utf8(s).unwrap();
 }
 
+fn lex_int(i: &mut usize, code_bytes: &[u8]) -> i64 {
+	let mut s = Vec::<u8>::new();
+	while code_bytes[*i].is_ascii_digit() {
+		s.push(code_bytes[*i]);
+		*i += 1;
+	}
+	return i64::from_str_radix(str::from_utf8(&s).unwrap(), 10).unwrap();
+}
+
 pub fn lex(code: String) -> Vec<Token> {
 	let mut tokens = Vec::<Token>::new();
 	let code_bytes = code.as_bytes();
 	
 	let mut i: usize = 0;
 	while i < code_bytes.len() {
-		if (code_bytes[i] as char).is_alphabetic() {
+		if code_bytes[i].is_ascii_alphabetic() {
 			tokens.push(lex_keyword(&mut i, code_bytes));
+		} else if code_bytes[i].is_ascii_digit() {
+			tokens.push(Token::IntLit(lex_int(&mut i, &code_bytes)));
 		} else {
 			tokens.push(match code_bytes[i] {
 				b'(' => Token::OpenParen,
