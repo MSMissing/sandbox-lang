@@ -1,5 +1,5 @@
 [package]
-name = "sans-vm"
+name = "sandbox-lang"
 version = "0.1.0"
 edition = "2024"
 

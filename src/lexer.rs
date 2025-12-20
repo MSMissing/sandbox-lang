@@ -8,6 +8,11 @@ pub enum Token {
 	CloseParen,
 	StringLit(String),
 	IntLit(i64),
+	Colon,
+	Plus,
+	Dash,
+	Star,
+	Slash,
 }
 
 fn lex_keyword(i: &mut usize, code_bytes: &[u8]) -> Token {
@@ -58,12 +63,17 @@ pub fn lex(code: String) -> Vec<Token> {
 				b')' => Token::CloseParen,
 				b'\"' => Token::StringLit(lex_string(&mut i, code_bytes)),
 				b'\n'|b' '|b'\t' => Token::None,
+				b'+' => Token::Plus,
+				b'-' => Token::Dash,
+				b'*' => Token::Star,
+				b'/' => Token::Slash,
 				_ => {panic!("Invalid token {}", code_bytes[i] as char);}
 			});
 			i += 1;
 		}
 	}
 	
+	// remove all of Token::None
 	i = 0;
 	while i < tokens.len() {
 		if tokens[i] == Token::None {

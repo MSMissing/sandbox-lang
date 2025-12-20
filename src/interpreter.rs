@@ -11,11 +11,21 @@ pub fn eval_expr(expr: parser::Expr) -> Value {
 	match expr {
 		parser::Expr::StringLit(strlit) => Value::_String(strlit),
 		parser::Expr::Int(intlit) => Value::_Int(intlit),
-		_ => panic!("Not implemented"),
+		parser::Expr::SumExpr { sign, summands } => {
+			match sign {
+				parser::Sign::Add => {
+					let Value::_Int(left) = eval_expr(summands[0].clone()) else {unimplemented!()};
+					let Value::_Int(right) = eval_expr(summands[1].clone()) else {unimplemented!()};
+					Value::_Int(left + right)
+				},
+				_ => todo!()
+			}
+		}
+		_ => unimplemented!(),
 	}
 }
 
-pub fn run_code<'a>(nodes: Vec<parser::Node<'a>>) -> Result<(), String> {
+pub fn run_code<'a>(nodes: Vec<parser::Node>) -> Result<(), String> {
 	let mut current: usize = 0;
 	
 	while current < nodes.len() {
@@ -39,7 +49,7 @@ pub fn run_code<'a>(nodes: Vec<parser::Node<'a>>) -> Result<(), String> {
 						exit(exit_code as i32);
 					},
 					_ => {
-						panic!("Exit code must be an int");
+						panic!("Exit code must be an Int");
 					}
 				}
 			}
