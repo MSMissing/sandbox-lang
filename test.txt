@@ -1,4 +1,2 @@
-x := 5 + 5
-x -= 5
-print("YIPPEEEEEEEEE")
-exit(x + 1)
+x := "stupid"
+print("I like trains, "; x)

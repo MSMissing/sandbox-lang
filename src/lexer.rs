@@ -16,6 +16,7 @@ pub enum Token {
 	Dash,
 	Star,
 	Slash,
+	Semicolon,
 }
 
 fn lex_keyword(i: &mut usize, code_bytes: &[u8]) -> Token {
@@ -72,6 +73,7 @@ pub fn lex(code: String) -> Vec<Token> {
 				b'-' => Token::Dash,
 				b'*' => Token::Star,
 				b'/' => Token::Slash,
+				b';' => Token::Semicolon,
 				_ => {panic!("Invalid token {}", code_bytes[i] as char);}
 			});
 			i += 1;

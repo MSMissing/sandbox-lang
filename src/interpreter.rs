@@ -1,4 +1,4 @@
-use std::{collections::HashMap, process::exit};
+use std::{collections::HashMap, mem::discriminant, process::exit};
 
 use crate::parser::{Node, Expr, Sign};
 
@@ -25,19 +25,37 @@ pub fn eval_expr(expr: Expr, ctx: &Interpreter) -> Result<Value, String> {
 	match expr {
 		Expr::StringLit(strlit) => Ok(Value::_String(strlit)),
 		Expr::Int(intlit) => Ok(Value::_Int(intlit)),
+		
+		
 		Expr::SumExpr { sign, summands } => {
-			let Value::_Int(left) = eval_expr(summands[0].clone(), ctx)? else {unimplemented!()};
-			let Value::_Int(right) = eval_expr(summands[1].clone(), ctx)? else {unimplemented!()};
-			match sign {
-				Sign::Add => {
-					Ok(Value::_Int(left + right))
-				},
-				Sign::Subtract => {
-					Ok(Value::_Int(left - right))
+			let left  = eval_expr(summands[0].clone(), ctx)?;
+			let right = eval_expr(summands[1].clone(), ctx)?;
+			
+			if discriminant(&left) == discriminant(&right) {
+				match left {
+					Value::_String(lstr) => {
+						let Value::_String(rstr) = right else {panic!("This should never happen.")};
+						match sign {
+							Sign::Concat => Ok(Value::_String(lstr + &rstr)),
+							_ => Err(format!("Cannot use sign {:?} on Strings.", sign))
+						}
+					},
+					Value::_Int(lint) => {
+						let Value::_Int(rint) = right else {panic!("This should never happen")};
+						match sign {
+							Sign::Add      => Ok(Value::_Int(lint + rint)),
+							Sign::Subtract => Ok(Value::_Int(lint - rint)),
+							Sign::Multiply => Ok(Value::_Int(lint * rint)),
+							Sign::Divide   => Ok(Value::_Int(lint / rint)),
+							_ => Err(format!("Cannot use sign {:?} on Ints.", sign))
+						}
+					}
 				}
-				_ => todo!()
+			} else {
+				Err("Implicit type casting not implemented".to_string())
 			}
 		},
+		
 		Expr::Ident(ident) => {
 			match ctx.variables.get(&ident) {
 				Some(val) => Ok((*val).clone()),

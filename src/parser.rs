@@ -1,7 +1,6 @@
-
 use crate::lexer::Token;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expr {
 	SumExpr {
 		sign: Sign,
@@ -12,21 +11,24 @@ pub enum Expr {
 	Ident(String),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Sign {
 	Add,
 	Subtract,
 	Multiply,
 	Divide,
+	Concat,
 }
 
 impl Sign {
 	fn from_token(token: Token) -> Result<Self, String> {
 		match token {
-			Token::Plus => Ok(Sign::Add),
-			Token::Dash => Ok(Sign::Subtract),
-			Token::Star => Ok(Sign::Multiply),
-			Token::Slash => Ok(Sign::Divide),
+			Token::Plus      => Ok(Sign::Add),
+			Token::Dash      => Ok(Sign::Subtract),
+			Token::Star      => Ok(Sign::Multiply),
+			Token::Slash     => Ok(Sign::Divide),
+			Token::Semicolon => Ok(Sign::Concat),
+			
 			_ => Err(format!("Expected sign, but got {:?}", token))
 		}
 	}
@@ -81,16 +83,17 @@ fn check_token(ctx: &ParserContext, token: Token) -> bool {
 
 fn parse_expr(ctx: &mut ParserContext) -> Result<Expr, String> {
 	let expr = match ctx.next_token() {
-		Token::StringLit(strlit) => Expr::StringLit(strlit),
-		Token::IntLit(intlit) => Expr::Int(intlit),
-		Token::Ident(ident) => Expr::Ident(ident),
-		_ => panic!("Expected expression, got {:?}", ctx.peek(0))
-	};
+		Token::StringLit(strlit) => Ok(Expr::StringLit(strlit)),
+		Token::IntLit(intlit) => Ok(Expr::Int(intlit)),
+		Token::Ident(ident) => Ok(Expr::Ident(ident)),
+		_ => Err(format!("Expected expression, got {:?}", ctx.peek(0)))
+	}?;
+	
 	if ctx.i >= ctx.tokens.len() {
 		return Ok(expr);
 	}
 	match ctx.peek(0) {
-		Token::Plus|Token::Dash|Token::Star|Token::Slash => {
+		Token::Plus|Token::Dash|Token::Star|Token::Slash|Token::Semicolon => {
 			let sign = Sign::from_token(ctx.next_token())?;
 			let sum = Expr::SumExpr {
 				sign: sign,
@@ -103,7 +106,7 @@ fn parse_expr(ctx: &mut ParserContext) -> Result<Expr, String> {
 	}
 }
 
-pub fn parse<'a>(tokens: Vec<Token>) -> Result<Vec<Node>, String> {
+pub fn parse(tokens: Vec<Token>) -> Result<Vec<Node>, String> {
 	let mut nodes = Vec::<Node>::new();
 	let mut ctx = ParserContext { tokens, i: 0 };
 	
