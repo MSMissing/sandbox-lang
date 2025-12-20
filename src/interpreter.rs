@@ -8,30 +8,33 @@ pub enum Value {
 	_Int(i64)
 }
 
-pub struct Context {
+pub struct Interpreter {
 	variables: HashMap<String, Value>
 }
 
-impl Context {
+impl Interpreter {
 	fn new() -> Self {
-		return Context {
+		return Interpreter {
 			variables: HashMap::new()
 		}
 	}
 }
 
 
-pub fn eval_expr(expr: Expr, ctx: &Context) -> Result<Value, String> {
+pub fn eval_expr(expr: Expr, ctx: &Interpreter) -> Result<Value, String> {
 	match expr {
 		Expr::StringLit(strlit) => Ok(Value::_String(strlit)),
 		Expr::Int(intlit) => Ok(Value::_Int(intlit)),
 		Expr::SumExpr { sign, summands } => {
+			let Value::_Int(left) = eval_expr(summands[0].clone(), ctx)? else {unimplemented!()};
+			let Value::_Int(right) = eval_expr(summands[1].clone(), ctx)? else {unimplemented!()};
 			match sign {
 				Sign::Add => {
-					let Value::_Int(left) = eval_expr(summands[0].clone(), ctx)? else {unimplemented!()};
-					let Value::_Int(right) = eval_expr(summands[1].clone(), ctx)? else {unimplemented!()};
 					Ok(Value::_Int(left + right))
 				},
+				Sign::Subtract => {
+					Ok(Value::_Int(left - right))
+				}
 				_ => todo!()
 			}
 		},
@@ -45,9 +48,10 @@ pub fn eval_expr(expr: Expr, ctx: &Context) -> Result<Value, String> {
 	}
 }
 
+
 pub fn run_code(nodes: Vec<Node>) -> Result<(), String> {
 	let mut current: usize = 0;
-	let mut ctx: Context = Context::new();
+	let mut ctx = Interpreter::new();
 	
 	while current < nodes.len() {
 		match nodes[current].clone() {

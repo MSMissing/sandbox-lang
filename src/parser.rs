@@ -20,6 +20,18 @@ pub enum Sign {
 	Divide,
 }
 
+impl Sign {
+	fn from_token(token: Token) -> Result<Self, String> {
+		match token {
+			Token::Plus => Ok(Sign::Add),
+			Token::Dash => Ok(Sign::Subtract),
+			Token::Star => Ok(Sign::Multiply),
+			Token::Slash => Ok(Sign::Divide),
+			_ => Err(format!("Expected sign, but got {:?}", token))
+		}
+	}
+}
+
 #[derive(Debug, Clone)]
 pub enum Node {
 	Print(Expr),
@@ -34,47 +46,56 @@ pub enum Node {
 	}
 }
 
+struct ParserContext {
+	tokens: Vec<Token>,
+	i: usize,
+}
 
-fn expect_token(i: &mut usize, tokens: &Vec<Token>, token: Token) -> Result<Token, String> {
-	if check_token(i, tokens, token.clone()) {
-		*i += 1;
-		return Ok(tokens[*i - 1].clone());
-	} else {
-		return Err(format!("Expected {:?}, but got {:?}", token, tokens[*i]));
+impl ParserContext {
+	#[inline]
+	fn peek(self: &mut Self, ahead: usize) -> Token {
+		self.tokens[self.i + ahead].clone()
+	}
+	#[inline]
+	fn next_token(self: &mut Self) -> Token {
+		let token = self.tokens[self.i].clone();
+		self.i += 1;
+		token
 	}
 }
 
-fn check_token(i: &usize, tokens: &Vec<Token>, token: Token) -> bool {
-	if tokens[*i].clone() == token {
+fn expect_token(ctx: &mut ParserContext, token: Token) -> Result<Token, String> {
+	if check_token(ctx, token.clone()) {
+		return Ok(ctx.next_token())
+	} else {
+		return Err(format!("Expected {:?}, but got {:?}", token, ctx.peek(0)));
+	}
+}
+
+fn check_token(ctx: &ParserContext, token: Token) -> bool {
+	if ctx.tokens[ctx.i].clone() == token {
 		return true;
 	}
 	return false;
 }
 
-fn parse_expr(i: &mut usize, tokens: &Vec<Token>) -> Result<Expr, String> {
-	let expr = match tokens[*i].clone() {
+fn parse_expr(ctx: &mut ParserContext) -> Result<Expr, String> {
+	let expr = match ctx.next_token() {
 		Token::StringLit(strlit) => Expr::StringLit(strlit),
 		Token::IntLit(intlit) => Expr::Int(intlit),
 		Token::Ident(ident) => Expr::Ident(ident),
-		_ => panic!("Expected expression, got {:?}", tokens[*i])
+		_ => panic!("Expected expression, got {:?}", ctx.peek(0))
 	};
-	*i += 1;
-	if *i >= tokens.len() {
+	if ctx.i >= ctx.tokens.len() {
 		return Ok(expr);
 	}
-	match tokens[*i] {
+	match ctx.peek(0) {
 		Token::Plus|Token::Dash|Token::Star|Token::Slash => {
-			let sign = match tokens[*i] {
-				Token::Plus => Ok(Sign::Add),
-				Token::Dash => Ok(Sign::Subtract),
-				Token::Star => Ok(Sign::Multiply),
-				Token::Slash => Ok(Sign::Divide),
-				_ => Err(format!("Expected sign, but got {:?}, this should never happen.", tokens[*i])),
-			}?;
-			let sum = Expr::SumExpr { sign: sign, summands: {
-				*i += 1;
-				vec!(expr, parse_expr(i, tokens)?)
-			}};
+			let sign = Sign::from_token(ctx.next_token())?;
+			let sum = Expr::SumExpr {
+				sign: sign,
+				summands: vec!(expr, parse_expr(ctx)?)
+			};
 			
 			Ok(sum)
 		},
@@ -84,43 +105,54 @@ fn parse_expr(i: &mut usize, tokens: &Vec<Token>) -> Result<Expr, String> {
 
 pub fn parse<'a>(tokens: Vec<Token>) -> Result<Vec<Node>, String> {
 	let mut nodes = Vec::<Node>::new();
+	let mut ctx = ParserContext { tokens, i: 0 };
 	
-	let mut i: usize = 0;
-	while i < tokens.len() {
-		let node: Result<Node, String> = match tokens[i].clone() {
+	while ctx.i < ctx.tokens.len() {
+		let node = match ctx.next_token() {
 			Token::Print => {
-				i += 1;
-				expect_token(&mut i, &tokens, Token::OpenParen)?;
-				let expr = parse_expr(&mut i, &tokens)?;
-				expect_token(&mut i, &tokens, Token::CloseParen)?;
+				expect_token(&mut ctx, Token::OpenParen)?;
+				let expr = parse_expr(&mut ctx)?;
+				expect_token(&mut ctx, Token::CloseParen)?;
 				Ok(Node::Print(expr))
 			},
 			Token::Exit => {
-				i += 1;
-				expect_token(&mut i, &tokens, Token::OpenParen)?;
-				let expr = parse_expr(&mut i, &tokens)?;
-				expect_token(&mut i, &tokens, Token::CloseParen)?;
+				expect_token(&mut ctx, Token::OpenParen)?;
+				let expr = parse_expr(&mut ctx)?;
+				expect_token(&mut ctx, Token::CloseParen)?;
 				Ok(Node::Exit(expr))
 			},
 			Token::Ident(ident) => {
-				i += 1;
-				match tokens[i] {
+				match ctx.next_token() {
 					Token::Colon => {
-						i += 1;
-						expect_token(&mut i, &tokens, Token::Equals)?;
-						let expr = parse_expr(&mut i, &tokens)?;
+						expect_token(&mut ctx, Token::Equals)?;
+						let expr = parse_expr(&mut ctx)?;
 						Ok(Node::Let {ident: ident, expr: expr})
 					},
 					Token::Equals => {
-						i += 1;
-						Ok(Node::Assign { ident, expr: parse_expr(&mut i, &tokens)? })
+						Ok(Node::Assign { ident, expr: parse_expr(&mut ctx)? })
 					},
-					_ => Err(format!("Expected : or =, but got {:?}", tokens[i]))
+					Token::Plus|Token::Dash|Token::Star|Token::Slash => {
+						ctx.i -= 1;
+						let sign = Sign::from_token(ctx.next_token())?;
+						expect_token(&mut ctx, Token::Equals)?;
+						Ok(Node::Assign { 
+							ident: ident.clone(),
+							expr: Expr::SumExpr {
+								sign,
+								summands: vec!(
+									Expr::Ident(ident),
+									parse_expr(&mut ctx)?
+								)
+							}
+						})
+					},
+					
+					_ => Err(format!("Unexpected identifier {}", ident))
 				}
 			}
-			_ => Err(format!("Unexpected token {:?}", tokens[i]))
-		};
-		nodes.push(node?);
+			_ => Err(format!("Unexpected token {:?}", ctx.peek(0)))
+		}?;
+		nodes.push(node);
 	}
 	
 	return Ok(nodes);

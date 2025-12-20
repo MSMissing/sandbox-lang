@@ -2,13 +2,21 @@ mod lexer;
 mod parser;
 mod interpreter;
 
-use std::env;
 use std::fs;
 
+use clap::Parser;
+
+#[derive(Parser, Debug)]
+#[command(author = "msMissing", version, about, long_about = None)]
+struct Arguments {
+	#[arg(short, long)]
+	file: Option<String>
+}
+
 fn main() -> Result<(), String> {
-	let args: Vec<String> = env::args().collect();
+	let args = Arguments::parse();
 	
-	let file = fs::read_to_string(args[1].clone()).unwrap();
+	let file = fs::read_to_string(args.file.unwrap().clone()).unwrap();
 	
 	let tokens = lexer::lex(file);
 	
