@@ -1,3 +1,5 @@
+
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Token {
 	None,
@@ -8,6 +10,7 @@ pub enum Token {
 	CloseParen,
 	StringLit(String),
 	IntLit(i64),
+	Equals,
 	Colon,
 	Plus,
 	Dash,
@@ -63,6 +66,8 @@ pub fn lex(code: String) -> Vec<Token> {
 				b')' => Token::CloseParen,
 				b'\"' => Token::StringLit(lex_string(&mut i, code_bytes)),
 				b'\n'|b' '|b'\t' => Token::None,
+				b':' => Token::Colon,
+				b'=' => Token::Equals,
 				b'+' => Token::Plus,
 				b'-' => Token::Dash,
 				b'*' => Token::Star,

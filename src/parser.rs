@@ -1,4 +1,5 @@
-use crate::lexer;
+
+use crate::lexer::Token;
 
 #[derive(Debug, Clone)]
 pub enum Expr {
@@ -8,6 +9,7 @@ pub enum Expr {
 	},
 	StringLit(String),
 	Int(i64),
+	Ident(String),
 }
 
 #[derive(Debug, Clone)]
@@ -22,9 +24,18 @@ pub enum Sign {
 pub enum Node {
 	Print(Expr),
 	Exit(Expr),
+	Let {
+		ident: String,
+		expr: Expr
+	},
+	Assign {
+		ident: String,
+		expr: Expr
+	}
 }
 
-fn expect_token(i: &mut usize, tokens: &Vec<lexer::Token>, token: lexer::Token) -> Result<lexer::Token, String> {
+
+fn expect_token(i: &mut usize, tokens: &Vec<Token>, token: Token) -> Result<Token, String> {
 	if check_token(i, tokens, token.clone()) {
 		*i += 1;
 		return Ok(tokens[*i - 1].clone());
@@ -33,64 +44,84 @@ fn expect_token(i: &mut usize, tokens: &Vec<lexer::Token>, token: lexer::Token) 
 	}
 }
 
-fn check_token(i: &usize, tokens: &Vec<lexer::Token>, token: lexer::Token) -> bool {
+fn check_token(i: &usize, tokens: &Vec<Token>, token: Token) -> bool {
 	if tokens[*i].clone() == token {
 		return true;
 	}
 	return false;
 }
 
-fn parse_expr(i: &mut usize, tokens: &Vec<lexer::Token>) -> Expr {
+fn parse_expr(i: &mut usize, tokens: &Vec<Token>) -> Result<Expr, String> {
 	let expr = match tokens[*i].clone() {
-		lexer::Token::StringLit(strlit) => Expr::StringLit(strlit),
-		lexer::Token::IntLit(intlit) => Expr::Int(intlit),
+		Token::StringLit(strlit) => Expr::StringLit(strlit),
+		Token::IntLit(intlit) => Expr::Int(intlit),
+		Token::Ident(ident) => Expr::Ident(ident),
 		_ => panic!("Expected expression, got {:?}", tokens[*i])
 	};
 	*i += 1;
+	if *i >= tokens.len() {
+		return Ok(expr);
+	}
 	match tokens[*i] {
-		lexer::Token::Plus|lexer::Token::Dash|lexer::Token::Star|lexer::Token::Slash => {
-			let sum = Expr::SumExpr { sign: match tokens[*i] {
-				lexer::Token::Plus => Sign::Add,
-				lexer::Token::Dash => Sign::Subtract,
-				lexer::Token::Star => Sign::Multiply,
-				lexer::Token::Slash => Sign::Divide,
-				_ => panic!("Expected sign, but got {:?}, this should never happen.", tokens[*i]),
-			}, summands: {
+		Token::Plus|Token::Dash|Token::Star|Token::Slash => {
+			let sign = match tokens[*i] {
+				Token::Plus => Ok(Sign::Add),
+				Token::Dash => Ok(Sign::Subtract),
+				Token::Star => Ok(Sign::Multiply),
+				Token::Slash => Ok(Sign::Divide),
+				_ => Err(format!("Expected sign, but got {:?}, this should never happen.", tokens[*i])),
+			}?;
+			let sum = Expr::SumExpr { sign: sign, summands: {
 				*i += 1;
-				vec!(expr, parse_expr(i, tokens))
+				vec!(expr, parse_expr(i, tokens)?)
 			}};
 			
-			return sum;
+			Ok(sum)
 		},
-		_ => {return expr;}
-	};
+		_ => Ok(expr)
+	}
 }
 
-pub fn parse<'a>(tokens: Vec<lexer::Token>) -> Vec<Node> {
+pub fn parse<'a>(tokens: Vec<Token>) -> Result<Vec<Node>, String> {
 	let mut nodes = Vec::<Node>::new();
 	
 	let mut i: usize = 0;
 	while i < tokens.len() {
-		nodes.push(match tokens[i] {
-			lexer::Token::Print => {
+		let node: Result<Node, String> = match tokens[i].clone() {
+			Token::Print => {
 				i += 1;
-				expect_token(&mut i, &tokens, lexer::Token::OpenParen).unwrap();
-				let expr = parse_expr(&mut i, &tokens);
-				expect_token(&mut i, &tokens, lexer::Token::CloseParen).unwrap();
-				Node::Print(expr)
+				expect_token(&mut i, &tokens, Token::OpenParen)?;
+				let expr = parse_expr(&mut i, &tokens)?;
+				expect_token(&mut i, &tokens, Token::CloseParen)?;
+				Ok(Node::Print(expr))
 			},
-			lexer::Token::Exit => {
+			Token::Exit => {
 				i += 1;
-				expect_token(&mut i, &tokens, lexer::Token::OpenParen).unwrap();
-				let expr = parse_expr(&mut i, &tokens);
-				expect_token(&mut i, &tokens, lexer::Token::CloseParen).unwrap();
-				Node::Exit(expr)
+				expect_token(&mut i, &tokens, Token::OpenParen)?;
+				let expr = parse_expr(&mut i, &tokens)?;
+				expect_token(&mut i, &tokens, Token::CloseParen)?;
+				Ok(Node::Exit(expr))
+			},
+			Token::Ident(ident) => {
+				i += 1;
+				match tokens[i] {
+					Token::Colon => {
+						i += 1;
+						expect_token(&mut i, &tokens, Token::Equals)?;
+						let expr = parse_expr(&mut i, &tokens)?;
+						Ok(Node::Let {ident: ident, expr: expr})
+					},
+					Token::Equals => {
+						i += 1;
+						Ok(Node::Assign { ident, expr: parse_expr(&mut i, &tokens)? })
+					},
+					_ => Err(format!("Expected : or =, but got {:?}", tokens[i]))
+				}
 			}
-			_ => {
-				panic!("Unexpected token {:?}", tokens[i]);
-			}
-		});
+			_ => Err(format!("Unexpected token {:?}", tokens[i]))
+		};
+		nodes.push(node?);
 	}
 	
-	return nodes;
+	return Ok(nodes);
 }
