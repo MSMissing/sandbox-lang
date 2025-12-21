@@ -1,2 +1,1 @@
-x := "stupid"
-print("I like trains, "; x)
+print(2 + 3 + 4)

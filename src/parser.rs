@@ -31,22 +31,21 @@ impl ParserContext {
 		self.i += 1;
 		token
 	}
-}
-
-fn expect_token(ctx: &mut ParserContext, token: Token) -> Result<Token, String> {
-	if check_token(ctx, token.clone()) {
-		return Ok(ctx.next_token())
-	} else {
-		return Err(format!("Expected {:?}, but got {:?}", token, ctx.peek(0)));
+	pub fn check_token(self: &mut Self, token: Token) -> bool {
+		if self.peek(0) == token {
+			return true;
+		}
+		return false;
+	}
+	pub fn expect_token(self: &mut Self, token: Token) -> Result<Token, String> {
+		if self.check_token(token.clone()) {
+			return Ok(self.next_token())
+		} else {
+			return Err(format!("Expected {:?}, but got {:?}", token, self.peek(0)));
+		}
 	}
 }
 
-fn check_token(ctx: &ParserContext, token: Token) -> bool {
-	if ctx.tokens[ctx.i].clone() == token {
-		return true;
-	}
-	return false;
-}
 
 pub fn parse(tokens: Vec<Token>) -> Result<Vec<Node>, String> {
 	let mut nodes = Vec::<Node>::new();
@@ -55,21 +54,21 @@ pub fn parse(tokens: Vec<Token>) -> Result<Vec<Node>, String> {
 	while ctx.i < ctx.tokens.len() {
 		let node = match ctx.next_token() {
 			Token::Print => {
-				expect_token(&mut ctx, Token::OpenParen)?;
+				ctx.expect_token(Token::OpenParen)?;
 				let expr = parse_expr(&mut ctx)?;
-				expect_token(&mut ctx, Token::CloseParen)?;
+				ctx.expect_token(Token::CloseParen)?;
 				Ok(Node::Print(expr))
 			},
 			Token::Exit => {
-				expect_token(&mut ctx, Token::OpenParen)?;
+				ctx.expect_token(Token::OpenParen)?;
 				let expr = parse_expr(&mut ctx)?;
-				expect_token(&mut ctx, Token::CloseParen)?;
+				ctx.expect_token(Token::CloseParen)?;
 				Ok(Node::Exit(expr))
 			},
 			Token::Ident(ident) => {
 				match ctx.next_token() {
 					Token::Colon => {
-						expect_token(&mut ctx, Token::Equals)?;
+						ctx.expect_token(Token::Equals)?;
 						let expr = parse_expr(&mut ctx)?;
 						Ok(Node::Let {ident: ident, expr: expr})
 					},
@@ -78,8 +77,8 @@ pub fn parse(tokens: Vec<Token>) -> Result<Vec<Node>, String> {
 					},
 					Token::Plus|Token::Dash|Token::Star|Token::Slash => {
 						ctx.i -= 1;
-						let sign = Sign::from_token(ctx.next_token())?;
-						expect_token(&mut ctx, Token::Equals)?;
+						let sign = Sign::from_token(&ctx.next_token())?;
+						ctx.expect_token(Token::Equals)?;
 						Ok(Node::Assign { 
 							ident: ident.clone(),
 							expr: Expr::SumExpr {
