@@ -1,6 +1,7 @@
 mod lexer;
 mod parser;
 mod interpreter;
+mod expr;
 
 use std::fs;
 

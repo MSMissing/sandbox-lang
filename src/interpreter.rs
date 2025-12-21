@@ -1,6 +1,7 @@
 use std::{collections::HashMap, mem::discriminant, process::exit};
 
-use crate::parser::{Node, Expr, Sign};
+use crate::expr::{Sign, Expr};
+use crate::parser::{Node};
 
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub enum Value {

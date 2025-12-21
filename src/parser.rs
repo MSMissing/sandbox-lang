@@ -1,38 +1,5 @@
 use crate::lexer::Token;
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Expr {
-	SumExpr {
-		sign: Sign,
-		summands: Vec<Expr>
-	},
-	StringLit(String),
-	Int(i64),
-	Ident(String),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Sign {
-	Add,
-	Subtract,
-	Multiply,
-	Divide,
-	Concat,
-}
-
-impl Sign {
-	fn from_token(token: Token) -> Result<Self, String> {
-		match token {
-			Token::Plus      => Ok(Sign::Add),
-			Token::Dash      => Ok(Sign::Subtract),
-			Token::Star      => Ok(Sign::Multiply),
-			Token::Slash     => Ok(Sign::Divide),
-			Token::Semicolon => Ok(Sign::Concat),
-			
-			_ => Err(format!("Expected sign, but got {:?}", token))
-		}
-	}
-}
+use crate::expr::{Expr, Sign, parse_expr};
 
 #[derive(Debug, Clone)]
 pub enum Node {
@@ -48,18 +15,18 @@ pub enum Node {
 	}
 }
 
-struct ParserContext {
-	tokens: Vec<Token>,
-	i: usize,
+pub struct ParserContext {
+	pub tokens: Vec<Token>,
+	pub i: usize,
 }
 
 impl ParserContext {
 	#[inline]
-	fn peek(self: &mut Self, ahead: usize) -> Token {
+	pub fn peek(self: &mut Self, ahead: usize) -> Token {
 		self.tokens[self.i + ahead].clone()
 	}
 	#[inline]
-	fn next_token(self: &mut Self) -> Token {
+	pub fn next_token(self: &mut Self) -> Token {
 		let token = self.tokens[self.i].clone();
 		self.i += 1;
 		token
@@ -79,31 +46,6 @@ fn check_token(ctx: &ParserContext, token: Token) -> bool {
 		return true;
 	}
 	return false;
-}
-
-fn parse_expr(ctx: &mut ParserContext) -> Result<Expr, String> {
-	let expr = match ctx.next_token() {
-		Token::StringLit(strlit) => Ok(Expr::StringLit(strlit)),
-		Token::IntLit(intlit) => Ok(Expr::Int(intlit)),
-		Token::Ident(ident) => Ok(Expr::Ident(ident)),
-		_ => Err(format!("Expected expression, got {:?}", ctx.peek(0)))
-	}?;
-	
-	if ctx.i >= ctx.tokens.len() {
-		return Ok(expr);
-	}
-	match ctx.peek(0) {
-		Token::Plus|Token::Dash|Token::Star|Token::Slash|Token::Semicolon => {
-			let sign = Sign::from_token(ctx.next_token())?;
-			let sum = Expr::SumExpr {
-				sign: sign,
-				summands: vec!(expr, parse_expr(ctx)?)
-			};
-			
-			Ok(sum)
-		},
-		_ => Ok(expr)
-	}
 }
 
 pub fn parse(tokens: Vec<Token>) -> Result<Vec<Node>, String> {
