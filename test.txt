@@ -1,1 +1,6 @@
-print(2 + 3 + 4)
+x: Int = 3
+{
+	x : String = "Hello, world!"
+	print(x)
+}
+print(x)

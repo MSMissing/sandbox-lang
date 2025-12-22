@@ -1,5 +1,5 @@
 use crate::lexer::Token;
-use crate::expr::{Expr, Sign, parse_expr};
+use crate::expr::{Expr, Sign, Type, parse_expr};
 
 #[derive(Debug, Clone)]
 pub enum Node {
@@ -7,12 +7,14 @@ pub enum Node {
 	Exit(Expr),
 	Let {
 		ident: String,
-		expr: Expr
+		expr: Expr,
+		var_type: Type
 	},
 	Assign {
 		ident: String,
-		expr: Expr
-	}
+		expr: Expr,
+	},
+	Scope(Vec<Node>)
 }
 
 pub struct ParserContext {
@@ -47,33 +49,58 @@ impl ParserContext {
 }
 
 
-pub fn parse(tokens: Vec<Token>) -> Result<Vec<Node>, String> {
+pub fn parse(ctx: &mut ParserContext, scope: usize) -> Result<Vec<Node>, String> {
 	let mut nodes = Vec::<Node>::new();
-	let mut ctx = ParserContext { tokens, i: 0 };
 	
 	while ctx.i < ctx.tokens.len() {
 		let node = match ctx.next_token() {
 			Token::Print => {
 				ctx.expect_token(Token::OpenParen)?;
-				let expr = parse_expr(&mut ctx)?;
+				let expr = parse_expr(ctx)?;
 				ctx.expect_token(Token::CloseParen)?;
 				Ok(Node::Print(expr))
 			},
 			Token::Exit => {
 				ctx.expect_token(Token::OpenParen)?;
-				let expr = parse_expr(&mut ctx)?;
+				let expr = parse_expr(ctx)?;
 				ctx.expect_token(Token::CloseParen)?;
 				Ok(Node::Exit(expr))
 			},
+			
+			Token::OpenBrace => {
+				Ok(Node::Scope(parse(ctx, scope + 1)?))
+			},
+			
+			Token::CloseBrace => {
+				if scope == 0 {
+					return Err("Unexpected }, You may have a missing {.".to_string());
+				}
+				return Ok(nodes);
+			},
+			
 			Token::Ident(ident) => {
 				match ctx.next_token() {
 					Token::Colon => {
-						ctx.expect_token(Token::Equals)?;
-						let expr = parse_expr(&mut ctx)?;
-						Ok(Node::Let {ident: ident, expr: expr})
+						match ctx.check_token(Token::Equals) {
+							true => {
+								ctx.next_token();
+								let expr = parse_expr(ctx)?;
+								Ok(Node::Let {ident, expr, var_type: Type::Auto })
+							},
+							false => {
+								match Type::from_token(ctx.next_token()) {
+									Ok(var_type) => {
+										ctx.expect_token(Token::Equals)?;
+										let expr = parse_expr(ctx)?;
+										Ok(Node::Let {ident, expr, var_type})
+									}
+									Err(e) => Err(e)
+								}
+							}
+						}
 					},
 					Token::Equals => {
-						Ok(Node::Assign { ident, expr: parse_expr(&mut ctx)? })
+						Ok(Node::Assign { ident, expr: parse_expr(ctx)? })
 					},
 					Token::Plus|Token::Dash|Token::Star|Token::Slash => {
 						ctx.i -= 1;
@@ -85,12 +112,11 @@ pub fn parse(tokens: Vec<Token>) -> Result<Vec<Node>, String> {
 								sign,
 								summands: vec!(
 									Expr::Ident(ident),
-									parse_expr(&mut ctx)?
+									parse_expr(ctx)?
 								)
 							}
 						})
 					},
-					
 					_ => Err(format!("Unexpected identifier {}", ident))
 				}
 			}

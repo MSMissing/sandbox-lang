@@ -8,6 +8,8 @@ pub enum Token {
 	Ident(String),
 	OpenParen,
 	CloseParen,
+	OpenBrace,
+	CloseBrace,
 	StringLit(String),
 	IntLit(i64),
 	Equals,
@@ -17,6 +19,9 @@ pub enum Token {
 	Star,
 	Slash,
 	Semicolon,
+	TypeString,
+	TypeInt,
+	TypeAny,
 }
 
 fn lex_keyword(i: &mut usize, code_bytes: &[u8]) -> Token {
@@ -25,9 +30,12 @@ fn lex_keyword(i: &mut usize, code_bytes: &[u8]) -> Token {
 		keyword.push(code_bytes[*i]);
 		*i += 1;
 	}
-	return match String::from_utf8(keyword.clone()).unwrap().as_str() {
-		"print" => Token::Print,
-		"exit" => Token::Exit,
+	return match keyword.as_slice() {
+		b"print" => Token::Print,
+		b"exit" => Token::Exit,
+		b"String" => Token::TypeString,
+		b"Int" => Token::TypeInt,
+		b"Any" => Token::TypeAny,
 		_ => Token::Ident(String::from_utf8(keyword).unwrap())
 	};
 }
@@ -65,6 +73,8 @@ pub fn lex(code: String) -> Vec<Token> {
 			tokens.push(match code_bytes[i] {
 				b'(' => Token::OpenParen,
 				b')' => Token::CloseParen,
+				b'{' => Token::OpenBrace,
+				b'}' => Token::CloseBrace,
 				b'\"' => Token::StringLit(lex_string(&mut i, code_bytes)),
 				b'\n'|b' '|b'\t' => Token::None,
 				b':' => Token::Colon,

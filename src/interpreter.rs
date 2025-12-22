@@ -1,6 +1,6 @@
 use std::{collections::HashMap, mem::discriminant, process::exit};
 
-use crate::expr::{Sign, Expr};
+use crate::expr::{Sign, Expr, Type};
 use crate::parser::{Node};
 
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
@@ -9,15 +9,73 @@ pub enum Value {
 	_Int(i64)
 }
 
+pub struct Scope {
+	variables: HashMap<String, Variable>
+}
+
+impl Scope {
+	pub fn new() -> Self {
+		Scope {
+			variables: HashMap::new()
+		}
+	}
+}
+
+
+#[derive(Clone, Debug)]
+pub struct Variable {
+	value: Value,
+	var_type: Type
+}
+
+impl Variable {
+	pub fn new(value: Value, var_type: Type) -> Self {
+		Self { value, var_type }
+	}
+}
+
 pub struct Interpreter {
-	variables: HashMap<String, Value>
+	scopes: Vec<Scope>
 }
 
 impl Interpreter {
-	fn new() -> Self {
+	pub fn new() -> Self {
 		return Interpreter {
-			variables: HashMap::new()
+			scopes: Vec::new(),
 		}
+	}
+	pub fn get_scope(self: &mut Self) -> &mut Scope {
+		return self.scopes.last_mut().unwrap()
+	}
+	pub fn get_var(self: &Self, ident: String) -> Result<&Variable, String> {
+		let scope_len = self.scopes.len();
+		for i in 0..scope_len {
+			match self.scopes[(scope_len - 1) - i].variables.get(&ident) {
+				Some(var) => return Ok(var),
+				None => ()
+			};
+		}
+		Err(format!("Variable {} is not initialized.", ident))
+	}
+	pub fn set_var(self: &mut Self, ident: String, value: Value) -> Result<(), String> {
+		let value_type = Type::from_value(value.clone());
+		let scope_len = self.scopes.len();
+		for i in 0..scope_len {
+			match self.scopes[(scope_len - 1) - i].variables.get_mut(&ident) {
+				Some(var) => {
+					if discriminant(&var.var_type) != discriminant(&value_type) {
+						return Err(format!("Implicit conversion from {:?} to {:?} is not supported", var.var_type, value_type))
+					}
+					var.value = value;
+					return Ok(());
+				},
+				None => ()
+			};
+		}
+		return Err(format!("Could not set the value of {}", ident));
+	}
+	pub fn init_var(self: &mut Self, ident: String, value: Value, var_type: Type) {
+		self.get_scope().variables.insert(ident, Variable::new(value, var_type));
 	}
 }
 
@@ -58,19 +116,16 @@ pub fn eval_expr(expr: Expr, ctx: &Interpreter) -> Result<Value, String> {
 		},
 		
 		Expr::Ident(ident) => {
-			match ctx.variables.get(&ident) {
-				Some(val) => Ok((*val).clone()),
-				None => Err(format!("Variable {} is uninitialized", ident))
-			}
+			Ok(ctx.get_var(ident)?.value.clone())
 		}
 		//_ => unimplemented!(),
 	}
 }
 
 
-pub fn run_code(nodes: Vec<Node>) -> Result<(), String> {
+pub fn run_code(ctx: &mut Interpreter, nodes: Vec<Node>) -> Result<(), String> {
+	ctx.scopes.push(Scope::new());
 	let mut current: usize = 0;
-	let mut ctx = Interpreter::new();
 	
 	while current < nodes.len() {
 		match nodes[current].clone() {
@@ -97,22 +152,21 @@ pub fn run_code(nodes: Vec<Node>) -> Result<(), String> {
 					}
 				}
 			},
-			Node::Let { ident, expr } => {
-				ctx.variables.insert(ident.clone(), eval_expr(expr, &ctx)?);
+			Node::Let { ident, expr, var_type } => {
+				ctx.init_var(ident.clone(), eval_expr(expr, ctx)?, var_type);
 			},
 			Node::Assign { ident, expr } => {
-				let value = eval_expr(expr, &ctx)?;
-				match ctx.variables.get_mut(&ident) {
-					Some(var) => {
-						*var = value;
-					},
-					None => panic!("{} not defined", ident)
-				}
+				let value = eval_expr(expr, ctx)?;
+				ctx.set_var(ident, value)?;
+			},
+			Node::Scope(nodes) => {
+				run_code(ctx, nodes)?;
 			}
 			// _ => panic!("what da hecc"),
-		}
+		};
 		current += 1;
 	}
 	
+	ctx.scopes.pop();
 	Ok(())
 }

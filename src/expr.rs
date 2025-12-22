@@ -1,3 +1,4 @@
+use crate::interpreter::Value;
 use crate::lexer::Token;
 use crate::parser::ParserContext;
 
@@ -10,6 +11,31 @@ pub enum Expr {
 	StringLit(String),
 	Int(i64),
 	Ident(String),
+}
+
+#[derive(Debug, Clone)]
+pub enum Type {
+	Int,
+	String,
+	Any,
+	Auto
+}
+
+impl Type {
+	pub fn from_token(token: Token) -> Result<Self, String> {
+		match token {
+			Token::TypeString => Ok(Type::String),
+			Token::TypeInt => Ok(Type::Int),
+			Token::TypeAny => Ok(Type::Any),
+			_ => Err(format!("Expected type, but got {:?}", token))
+		}
+	}
+	pub fn from_value(value: Value) -> Self {
+		match value {
+			Value::_String(_) => Type::String,
+			Value::_Int(_) => Type::Int
+		}
+	}
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
