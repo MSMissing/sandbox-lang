@@ -14,6 +14,10 @@ pub enum Node {
 		ident: String,
 		expr: Expr,
 	},
+	If {
+		expr: Expr,
+		body: Box<Node>
+	},
 	Scope(Vec<Node>)
 }
 
@@ -77,6 +81,12 @@ pub fn parse(ctx: &mut ParserContext, scope: usize) -> Result<Vec<Node>, String>
 				}
 				return Ok(nodes);
 			},
+			
+			Token::If => {
+				let expr = parse_expr(ctx)?;
+				ctx.expect_token(Token::OpenBrace)?;
+				Ok(Node::If { expr, body: Box::new(Node::Scope(parse(ctx, scope + 1)?)) })
+			}
 			
 			Token::Ident(ident) => {
 				match ctx.next_token() {

@@ -6,7 +6,8 @@ use crate::parser::{Node};
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub enum Value {
 	_String(String),
-	_Int(i64)
+	_Int(i64),
+	_Bool(bool)
 }
 
 pub struct Scope {
@@ -84,23 +85,21 @@ pub fn eval_expr(expr: Expr, ctx: &Interpreter) -> Result<Value, String> {
 	match expr {
 		Expr::StringLit(strlit) => Ok(Value::_String(strlit)),
 		Expr::Int(intlit) => Ok(Value::_Int(intlit)),
-		
+		Expr::Bool(boollit) => Ok(Value::_Bool(boollit)),
 		
 		Expr::SumExpr { sign, summands } => {
 			let left  = eval_expr(summands[0].clone(), ctx)?;
 			let right = eval_expr(summands[1].clone(), ctx)?;
 			
 			if discriminant(&left) == discriminant(&right) {
-				match left {
-					Value::_String(lstr) => {
-						let Value::_String(rstr) = right else {panic!("This should never happen.")};
+				match (left, right) {
+					(Value::_String(lstr), Value::_String(rstr)) => {
 						match sign {
 							Sign::Concat => Ok(Value::_String(lstr + &rstr)),
 							_ => Err(format!("Cannot use sign {:?} on Strings.", sign))
 						}
 					},
-					Value::_Int(lint) => {
-						let Value::_Int(rint) = right else {panic!("This should never happen")};
+					(Value::_Int(lint), Value::_Int(rint)) => {
 						match sign {
 							Sign::Add      => Ok(Value::_Int(lint + rint)),
 							Sign::Subtract => Ok(Value::_Int(lint - rint)),
@@ -108,7 +107,14 @@ pub fn eval_expr(expr: Expr, ctx: &Interpreter) -> Result<Value, String> {
 							Sign::Divide   => Ok(Value::_Int(lint / rint)),
 							_ => Err(format!("Cannot use sign {:?} on Ints.", sign))
 						}
-					}
+					},
+					(Value::_Bool(lbool), Value::_Bool(rbool)) => {
+						match sign {
+							Sign::Equal => Ok(Value::_Bool(lbool == rbool)),
+							_ => Err(format!("Cannot use sign {:?} on Bools", sign)),
+						}
+					},
+					_ => panic!("This should never happen.")
 				}
 			} else {
 				Err("Implicit type casting not implemented".to_string())
@@ -122,6 +128,19 @@ pub fn eval_expr(expr: Expr, ctx: &Interpreter) -> Result<Value, String> {
 	}
 }
 
+fn truthy(value: Value) -> bool {
+	match value {
+		 Value::_String(s) => {
+			 !s.is_empty()
+		},
+		Value::_Int(i) => {
+			i != 0
+		},
+		Value::_Bool(b) => {
+			b
+		}
+	}
+}
 
 pub fn run_code(ctx: &mut Interpreter, nodes: Vec<Node>) -> Result<(), String> {
 	ctx.scopes.push(Scope::new());
@@ -137,6 +156,9 @@ pub fn run_code(ctx: &mut Interpreter, nodes: Vec<Node>) -> Result<(), String> {
 					},
 					Value::_Int(int_to_print) => {
 						println!("{}", int_to_print);
+					},
+					Value::_Bool(bool_to_print) => {
+						println!("{}", bool_to_print);
 					}
 				}
 			},
@@ -147,6 +169,9 @@ pub fn run_code(ctx: &mut Interpreter, nodes: Vec<Node>) -> Result<(), String> {
 						println!("Program exited with code {}", exit_code);
 						exit(exit_code as i32);
 					},
+					Value::_Bool(exit_code) => {
+						exit(!exit_code as i32);
+					}
 					_ => {
 						panic!("Exit code must be an Int");
 					}
@@ -161,6 +186,13 @@ pub fn run_code(ctx: &mut Interpreter, nodes: Vec<Node>) -> Result<(), String> {
 			},
 			Node::Scope(nodes) => {
 				run_code(ctx, nodes)?;
+			},
+			Node::If { expr, body } => {
+				let value = eval_expr(expr, ctx)?;
+				let Node::Scope(body_nodes) = *body else {panic!("Expected Node::Scope for if body. This should never happen.");};
+				if truthy(value) {
+					run_code(ctx, body_nodes)?;
+				}
 			}
 			// _ => panic!("what da hecc"),
 		};

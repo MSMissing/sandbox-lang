@@ -1,6 +1,11 @@
-x: Int = 3
-{
-	x : String = "Hello, world!"
-	print(x)
+x := false
+y := false
+if x {
+	print("x yay")
 }
-print(x)
+if y {
+	print("y yay")
+}
+if x = y {
+	print("x = y")
+}

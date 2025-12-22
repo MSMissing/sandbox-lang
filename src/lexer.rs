@@ -6,6 +6,12 @@ pub enum Token {
 	Print,
 	Exit,
 	Ident(String),
+	TypeString,
+	TypeBool,
+	TypeInt,
+	TypeAny,
+	True,
+	False,
 	OpenParen,
 	CloseParen,
 	OpenBrace,
@@ -19,9 +25,7 @@ pub enum Token {
 	Star,
 	Slash,
 	Semicolon,
-	TypeString,
-	TypeInt,
-	TypeAny,
+	If,
 }
 
 fn lex_keyword(i: &mut usize, code_bytes: &[u8]) -> Token {
@@ -33,9 +37,13 @@ fn lex_keyword(i: &mut usize, code_bytes: &[u8]) -> Token {
 	return match keyword.as_slice() {
 		b"print" => Token::Print,
 		b"exit" => Token::Exit,
+		b"if" => Token::If,
 		b"String" => Token::TypeString,
 		b"Int" => Token::TypeInt,
+		b"Bool" => Token::TypeBool,
 		b"Any" => Token::TypeAny,
+		b"true" => Token::True,
+		b"false" => Token::False,
 		_ => Token::Ident(String::from_utf8(keyword).unwrap())
 	};
 }

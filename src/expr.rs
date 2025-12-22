@@ -10,6 +10,7 @@ pub enum Expr {
 	},
 	StringLit(String),
 	Int(i64),
+	Bool(bool),
 	Ident(String),
 }
 
@@ -17,6 +18,7 @@ pub enum Expr {
 pub enum Type {
 	Int,
 	String,
+	Bool,
 	Any,
 	Auto
 }
@@ -26,6 +28,7 @@ impl Type {
 		match token {
 			Token::TypeString => Ok(Type::String),
 			Token::TypeInt => Ok(Type::Int),
+			Token::TypeBool => Ok(Type::Bool),
 			Token::TypeAny => Ok(Type::Any),
 			_ => Err(format!("Expected type, but got {:?}", token))
 		}
@@ -33,7 +36,8 @@ impl Type {
 	pub fn from_value(value: Value) -> Self {
 		match value {
 			Value::_String(_) => Type::String,
-			Value::_Int(_) => Type::Int
+			Value::_Int(_) => Type::Int,
+			Value::_Bool(_) => Type::Bool
 		}
 	}
 }
@@ -44,6 +48,7 @@ pub enum Sign {
 	Subtract,
 	Multiply,
 	Divide,
+	Equal,
 	Concat,
 }
 
@@ -57,6 +62,7 @@ impl Sign {
 			Token::Star      => Ok(Sign::Multiply),
 			Token::Slash     => Ok(Sign::Divide),
 			Token::Semicolon => Ok(Sign::Concat),
+			Token::Equals    => Ok(Sign::Equal),
 			
 			_                => Err(format!("Expected sign, but got {:?}", token))
 		}
@@ -68,11 +74,12 @@ impl Sign {
 			Sign::Multiply => 2,
 			Sign::Divide   => 2,
 			Sign::Concat   => 1,
+			Sign::Equal    => 2
 		}
 	}
 	pub fn is_sign(token: &Token) -> bool {
 		match token {
-			Token::Plus|Token::Dash|Token::Star|Token::Slash|Token::Semicolon => true,
+			Token::Plus|Token::Dash|Token::Star|Token::Slash|Token::Semicolon|Token::Equals => true,
 			_ => false
 		}
 	}
@@ -119,8 +126,10 @@ pub fn parse_primary(ctx: &mut ParserContext,) -> Result<Expr, String> {
 	let token = ctx.next_token();
 	match token {
 		Token::StringLit(strlit) => Ok(Expr::StringLit(strlit)),
-		Token::IntLit(intlit) => Ok(Expr::Int(intlit)),
-		Token::Ident(ident) => Ok(Expr::Ident(ident)),
+		Token::IntLit(intlit)    => Ok(Expr::Int(intlit)),
+		Token::False             => Ok(Expr::Bool(false)),
+		Token::True              => Ok(Expr::Bool(true)),
+		Token::Ident(ident)      => Ok(Expr::Ident(ident)),
 		Token::OpenParen => {
 			let expr = parse_expr(ctx);
 			ctx.expect_token(Token::CloseParen)?;
