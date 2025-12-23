@@ -1,4 +1,6 @@
-use std::{collections::HashMap, mem::discriminant, process::exit};
+use std::mem::discriminant;
+use std::process::exit;
+use std::collections::HashMap;
 
 use crate::expr::{Sign, Expr, Type};
 use crate::parser::{Node};
@@ -75,8 +77,19 @@ impl Interpreter {
 		}
 		return Err(format!("Could not set the value of {}", ident));
 	}
-	pub fn init_var(self: &mut Self, ident: String, value: Value, var_type: Type) {
-		self.get_scope().variables.insert(ident, Variable::new(value, var_type));
+	pub fn init_var(self: &mut Self, ident: String, value: Value, var_type: Type) -> Result<(), String> {
+		self.get_scope().variables.insert(ident, Variable::new(value.clone(), match var_type == Type::Auto {
+			true => Ok(Type::from_value(value)),
+			false => {
+				let expr_type = Type::from_value(value);
+				if expr_type != var_type {
+					Err(format!("Expected type {:?}, but got {:?}", var_type, expr_type))
+				} else {
+					Ok(var_type)
+				}
+			}
+		}?));
+		Ok(())
 	}
 }
 
@@ -86,12 +99,21 @@ pub fn eval_expr(expr: Expr, ctx: &Interpreter) -> Result<Value, String> {
 		Expr::StringLit(strlit) => Ok(Value::_String(strlit)),
 		Expr::Int(intlit) => Ok(Value::_Int(intlit)),
 		Expr::Bool(boollit) => Ok(Value::_Bool(boollit)),
+		Expr::Not(expr2) => {
+			let Value::_Bool(value) = eval_expr(*expr2, ctx)? else {
+				return Err(format!("Expected bool after !"));
+			};
+			
+			Ok(Value::_Bool(!value))
+		}
 		
 		Expr::SumExpr { sign, summands } => {
 			let left  = eval_expr(summands[0].clone(), ctx)?;
 			let right = eval_expr(summands[1].clone(), ctx)?;
 			
-			if discriminant(&left) == discriminant(&right) {
+			if sign == Sign::Equal {
+				return Ok(Value::_Bool(left == right));
+			} else if discriminant(&left) == discriminant(&right) {
 				match (left, right) {
 					(Value::_String(lstr), Value::_String(rstr)) => {
 						match sign {
@@ -178,7 +200,7 @@ pub fn run_code(ctx: &mut Interpreter, nodes: Vec<Node>) -> Result<(), String> {
 				}
 			},
 			Node::Let { ident, expr, var_type } => {
-				ctx.init_var(ident.clone(), eval_expr(expr, ctx)?, var_type);
+				ctx.init_var(ident.clone(), eval_expr(expr, ctx)?, var_type)?;
 			},
 			Node::Assign { ident, expr } => {
 				let value = eval_expr(expr, ctx)?;
@@ -192,6 +214,14 @@ pub fn run_code(ctx: &mut Interpreter, nodes: Vec<Node>) -> Result<(), String> {
 				let Node::Scope(body_nodes) = *body else {panic!("Expected Node::Scope for if body. This should never happen.");};
 				if truthy(value) {
 					run_code(ctx, body_nodes)?;
+				}
+			},
+			Node::While { expr, body } => {
+				let mut value = eval_expr(expr.clone(), ctx)?;
+				let Node::Scope(body_nodes) = *body else {panic!("Expected Node::Scope for if body. This should never happen.");};
+				while truthy(value.clone()) {
+					run_code(ctx, body_nodes.clone())?;
+					value = eval_expr(expr.clone(), ctx)?;
 				}
 			}
 			// _ => panic!("what da hecc"),

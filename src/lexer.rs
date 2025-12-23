@@ -19,6 +19,7 @@ pub enum Token {
 	StringLit(String),
 	IntLit(i64),
 	Equals,
+	Bang,
 	Colon,
 	Plus,
 	Dash,
@@ -26,6 +27,7 @@ pub enum Token {
 	Slash,
 	Semicolon,
 	If,
+	While,
 }
 
 fn lex_keyword(i: &mut usize, code_bytes: &[u8]) -> Token {
@@ -38,6 +40,7 @@ fn lex_keyword(i: &mut usize, code_bytes: &[u8]) -> Token {
 		b"print" => Token::Print,
 		b"exit" => Token::Exit,
 		b"if" => Token::If,
+		b"while" => Token::While,
 		b"String" => Token::TypeString,
 		b"Int" => Token::TypeInt,
 		b"Bool" => Token::TypeBool,
@@ -92,6 +95,7 @@ pub fn lex(code: String) -> Vec<Token> {
 				b'*' => Token::Star,
 				b'/' => Token::Slash,
 				b';' => Token::Semicolon,
+				b'!' => Token::Bang,
 				_ => {panic!("Invalid token {}", code_bytes[i] as char);}
 			});
 			i += 1;

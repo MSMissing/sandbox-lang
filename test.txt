@@ -1,11 +1,5 @@
-x := false
-y := false
-if x {
-	print("x yay")
-}
-if y {
-	print("y yay")
-}
-if x = y {
-	print("x = y")
+x := 4
+while x {
+	print(x)
+	x -= 1
 }

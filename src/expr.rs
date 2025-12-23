@@ -11,10 +11,11 @@ pub enum Expr {
 	StringLit(String),
 	Int(i64),
 	Bool(bool),
+	Not(Box<Expr>),
 	Ident(String),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Type {
 	Int,
 	String,
@@ -91,7 +92,10 @@ pub fn parse_expr(ctx: &mut ParserContext) -> Result<Expr, String> {
 }
 
 pub fn parse_expr_1(ctx: &mut ParserContext, lhs: Expr, min_precedence: Precedence) -> Result<Expr, String> {
-	let mut lookahead = ctx.peek(0);
+	let mut lookahead = match ctx.peek(0) {
+		Ok(token) => token,
+		Err(_) => {return Ok(lhs);}
+	};
 	if !Sign::is_sign(&lookahead) {
 		return Ok(lhs);
 	};
@@ -101,10 +105,10 @@ pub fn parse_expr_1(ctx: &mut ParserContext, lhs: Expr, min_precedence: Preceden
 		false => false
 	} {
 		let op = Sign::from_token(&lookahead)?;
-		ctx.next_token();
+		ctx.next_token()?;
 		let mut rhs = parse_primary(ctx)?;
 		
-		lookahead = ctx.peek(0);
+		lookahead = ctx.peek(0)?;
 		while match Sign::is_sign(&lookahead) {
 			true => Sign::from_token(&lookahead).unwrap().get_precedence() > op.get_precedence(),
 			false => false
@@ -114,7 +118,7 @@ pub fn parse_expr_1(ctx: &mut ParserContext, lhs: Expr, min_precedence: Preceden
 							true => 1,
 							false => 0
 						})?;
-			lookahead = ctx.peek(0);
+			lookahead = ctx.peek(0)?;
 		}
 		expr = Expr::SumExpr { sign: op, summands: vec!(expr, rhs) };
 	}
@@ -123,12 +127,16 @@ pub fn parse_expr_1(ctx: &mut ParserContext, lhs: Expr, min_precedence: Preceden
 
 
 pub fn parse_primary(ctx: &mut ParserContext,) -> Result<Expr, String> {
-	let token = ctx.next_token();
+	let token = ctx.next_token()?;
 	match token {
 		Token::StringLit(strlit) => Ok(Expr::StringLit(strlit)),
 		Token::IntLit(intlit)    => Ok(Expr::Int(intlit)),
 		Token::False             => Ok(Expr::Bool(false)),
 		Token::True              => Ok(Expr::Bool(true)),
+		Token::Bang              => {
+			let expr = parse_primary(ctx)?;
+			Ok(Expr::Not(Box::new(expr)))
+		}
 		Token::Ident(ident)      => Ok(Expr::Ident(ident)),
 		Token::OpenParen => {
 			let expr = parse_expr(ctx);

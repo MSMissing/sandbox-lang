@@ -18,6 +18,10 @@ pub enum Node {
 		expr: Expr,
 		body: Box<Node>
 	},
+	While {
+		expr: Expr,
+		body: Box<Node>
+	},
 	Scope(Vec<Node>)
 }
 
@@ -27,25 +31,35 @@ pub struct ParserContext {
 }
 
 impl ParserContext {
-	#[inline]
-	pub fn peek(self: &mut Self, ahead: usize) -> Token {
-		self.tokens[self.i + ahead].clone()
+	pub fn peek(self: &Self, ahead: usize) -> Result<Token, String> {
+		if self.i + ahead >= self.tokens.len() {
+			return Err(String::from("Index out of bounds"));
+		}
+		Ok(self.tokens[self.i + ahead].clone())
 	}
-	#[inline]
-	pub fn next_token(self: &mut Self) -> Token {
+	pub fn next_token(self: &mut Self) -> Result<Token, String> {
+		if self.i >= self.tokens.len() {
+			return Err(String::from("Index out of bounds"));
+		}
 		let token = self.tokens[self.i].clone();
 		self.i += 1;
-		token
+		Ok(token)
 	}
 	pub fn check_token(self: &mut Self, token: Token) -> bool {
-		if self.peek(0) == token {
-			return true;
+		match self.peek(0) {
+			Ok(t) => {
+				if t == token {
+					true
+				} else {
+					false
+				}
+			},
+			Err(_) => false
 		}
-		return false;
 	}
 	pub fn expect_token(self: &mut Self, token: Token) -> Result<Token, String> {
 		if self.check_token(token.clone()) {
-			return Ok(self.next_token())
+			return Ok(self.next_token()?)
 		} else {
 			return Err(format!("Expected {:?}, but got {:?}", token, self.peek(0)));
 		}
@@ -57,7 +71,7 @@ pub fn parse(ctx: &mut ParserContext, scope: usize) -> Result<Vec<Node>, String>
 	let mut nodes = Vec::<Node>::new();
 	
 	while ctx.i < ctx.tokens.len() {
-		let node = match ctx.next_token() {
+		let node = match ctx.next_token()? {
 			Token::Print => {
 				ctx.expect_token(Token::OpenParen)?;
 				let expr = parse_expr(ctx)?;
@@ -86,19 +100,25 @@ pub fn parse(ctx: &mut ParserContext, scope: usize) -> Result<Vec<Node>, String>
 				let expr = parse_expr(ctx)?;
 				ctx.expect_token(Token::OpenBrace)?;
 				Ok(Node::If { expr, body: Box::new(Node::Scope(parse(ctx, scope + 1)?)) })
-			}
+			},
+			
+			Token::While => {
+				let expr = parse_expr(ctx)?;
+				ctx.expect_token(Token::OpenBrace)?;
+				Ok(Node::While { expr, body: Box::new(Node::Scope(parse(ctx, scope + 1)?)) })
+			},
 			
 			Token::Ident(ident) => {
-				match ctx.next_token() {
+				match ctx.next_token()? {
 					Token::Colon => {
 						match ctx.check_token(Token::Equals) {
 							true => {
-								ctx.next_token();
+								ctx.next_token()?;
 								let expr = parse_expr(ctx)?;
 								Ok(Node::Let {ident, expr, var_type: Type::Auto })
 							},
 							false => {
-								match Type::from_token(ctx.next_token()) {
+								match Type::from_token(ctx.next_token()?) {
 									Ok(var_type) => {
 										ctx.expect_token(Token::Equals)?;
 										let expr = parse_expr(ctx)?;
@@ -114,7 +134,7 @@ pub fn parse(ctx: &mut ParserContext, scope: usize) -> Result<Vec<Node>, String>
 					},
 					Token::Plus|Token::Dash|Token::Star|Token::Slash => {
 						ctx.i -= 1;
-						let sign = Sign::from_token(&ctx.next_token())?;
+						let sign = Sign::from_token(&ctx.next_token()?)?;
 						ctx.expect_token(Token::Equals)?;
 						Ok(Node::Assign { 
 							ident: ident.clone(),
