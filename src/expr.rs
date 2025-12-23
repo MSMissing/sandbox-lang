@@ -4,7 +4,7 @@ use crate::parser::ParserContext;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expr {
-	SumExpr {
+	Sum {
 		sign: Sign,
 		summands: Vec<Expr>
 	},
@@ -68,7 +68,7 @@ impl Sign {
 			_                => Err(format!("Expected sign, but got {:?}", token))
 		}
 	}
-	pub fn get_precedence(self: &Self) -> Precedence {
+	pub fn get_precedence(&self) -> Precedence {
 		match self {
 			Sign::Add      => 1,
 			Sign::Subtract => 1,
@@ -79,16 +79,13 @@ impl Sign {
 		}
 	}
 	pub fn is_sign(token: &Token) -> bool {
-		match token {
-			Token::Plus|Token::Dash|Token::Star|Token::Slash|Token::Semicolon|Token::Equals => true,
-			_ => false
-		}
+		matches!(token, Token::Plus|Token::Dash|Token::Star|Token::Slash|Token::Semicolon|Token::Equals)
 	}
 }
 
 pub fn parse_expr(ctx: &mut ParserContext) -> Result<Expr, String> {
 	let primary = parse_primary(ctx)?;
-	return parse_expr_1(ctx, primary, 0);
+	parse_expr_1(ctx, primary, 0)
 }
 
 pub fn parse_expr_1(ctx: &mut ParserContext, lhs: Expr, min_precedence: Precedence) -> Result<Expr, String> {
@@ -120,7 +117,7 @@ pub fn parse_expr_1(ctx: &mut ParserContext, lhs: Expr, min_precedence: Preceden
 						})?;
 			lookahead = ctx.peek(0)?;
 		}
-		expr = Expr::SumExpr { sign: op, summands: vec!(expr, rhs) };
+		expr = Expr::Sum { sign: op, summands: vec!(expr, rhs) };
 	}
 	Ok(expr)
 }

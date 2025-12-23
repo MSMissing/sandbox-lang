@@ -1,7 +1,7 @@
 use crate::lexer::Token;
 use crate::expr::{Expr, Sign, Type, parse_expr};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Node {
 	Print(Expr),
 	Exit(Expr),
@@ -31,13 +31,13 @@ pub struct ParserContext {
 }
 
 impl ParserContext {
-	pub fn peek(self: &Self, ahead: usize) -> Result<Token, String> {
+	pub fn peek(&self, ahead: usize) -> Result<Token, String> {
 		if self.i + ahead >= self.tokens.len() {
 			return Err(String::from("Index out of bounds"));
 		}
 		Ok(self.tokens[self.i + ahead].clone())
 	}
-	pub fn next_token(self: &mut Self) -> Result<Token, String> {
+	pub fn next_token(&mut self) -> Result<Token, String> {
 		if self.i >= self.tokens.len() {
 			return Err(String::from("Index out of bounds"));
 		}
@@ -45,23 +45,26 @@ impl ParserContext {
 		self.i += 1;
 		Ok(token)
 	}
-	pub fn check_token(self: &mut Self, token: Token) -> bool {
+	pub fn check_token(&mut self, token: Token) -> bool {
 		match self.peek(0) {
 			Ok(t) => {
-				if t == token {
-					true
-				} else {
-					false
-				}
+				t == token
 			},
 			Err(_) => false
 		}
 	}
-	pub fn expect_token(self: &mut Self, token: Token) -> Result<Token, String> {
+	pub fn expect_token(&mut self, token: Token) -> Result<Token, String> {
 		if self.check_token(token.clone()) {
-			return Ok(self.next_token()?)
+			Ok(self.next_token()?)
 		} else {
-			return Err(format!("Expected {:?}, but got {:?}", token, self.peek(0)));
+			Err(format!("Expected {:?}, but got {:?}", token, self.peek(0)))
+		}
+	}
+	
+	pub fn new(tokens: Vec<Token>) -> Self {
+		Self {
+			tokens,
+			i: 0
 		}
 	}
 }
@@ -138,7 +141,7 @@ pub fn parse(ctx: &mut ParserContext, scope: usize) -> Result<Vec<Node>, String>
 						ctx.expect_token(Token::Equals)?;
 						Ok(Node::Assign { 
 							ident: ident.clone(),
-							expr: Expr::SumExpr {
+							expr: Expr::Sum {
 								sign,
 								summands: vec!(
 									Expr::Ident(ident),
@@ -155,5 +158,5 @@ pub fn parse(ctx: &mut ParserContext, scope: usize) -> Result<Vec<Node>, String>
 		nodes.push(node);
 	}
 	
-	return Ok(nodes);
+	Ok(nodes)
 }

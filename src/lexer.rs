@@ -1,5 +1,3 @@
-
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Token {
 	None,
@@ -36,7 +34,7 @@ fn lex_keyword(i: &mut usize, code_bytes: &[u8]) -> Token {
 		keyword.push(code_bytes[*i]);
 		*i += 1;
 	}
-	return match keyword.as_slice() {
+	match keyword.as_slice() {
 		b"print" => Token::Print,
 		b"exit" => Token::Exit,
 		b"if" => Token::If,
@@ -48,7 +46,7 @@ fn lex_keyword(i: &mut usize, code_bytes: &[u8]) -> Token {
 		b"true" => Token::True,
 		b"false" => Token::False,
 		_ => Token::Ident(String::from_utf8(keyword).unwrap())
-	};
+	}
 }
 
 fn lex_string(i: &mut usize, code_bytes: &[u8]) -> String {
@@ -58,7 +56,7 @@ fn lex_string(i: &mut usize, code_bytes: &[u8]) -> String {
 		s.push(code_bytes[*i]);
 		*i += 1;
 	}
-	return String::from_utf8(s).unwrap();
+	String::from_utf8(s).unwrap()
 }
 
 fn lex_int(i: &mut usize, code_bytes: &[u8]) -> i64 {
@@ -67,10 +65,10 @@ fn lex_int(i: &mut usize, code_bytes: &[u8]) -> i64 {
 		s.push(code_bytes[*i]);
 		*i += 1;
 	}
-	return i64::from_str_radix(str::from_utf8(&s).unwrap(), 10).unwrap();
+	str::from_utf8(&s).unwrap().parse().unwrap()
 }
 
-pub fn lex(code: String) -> Vec<Token> {
+pub fn lex(code: String) -> Result<Vec<Token>, String> {
 	let mut tokens = Vec::<Token>::new();
 	let code_bytes = code.as_bytes();
 	
@@ -79,7 +77,7 @@ pub fn lex(code: String) -> Vec<Token> {
 		if code_bytes[i].is_ascii_alphabetic() {
 			tokens.push(lex_keyword(&mut i, code_bytes));
 		} else if code_bytes[i].is_ascii_digit() {
-			tokens.push(Token::IntLit(lex_int(&mut i, &code_bytes)));
+			tokens.push(Token::IntLit(lex_int(&mut i, code_bytes)));
 		} else {
 			tokens.push(match code_bytes[i] {
 				b'(' => Token::OpenParen,
@@ -96,7 +94,7 @@ pub fn lex(code: String) -> Vec<Token> {
 				b'/' => Token::Slash,
 				b';' => Token::Semicolon,
 				b'!' => Token::Bang,
-				_ => {panic!("Invalid token {}", code_bytes[i] as char);}
+				_ => return Err(format!("Invalid token {}", code_bytes[i] as char))
 			});
 			i += 1;
 		}
@@ -112,5 +110,5 @@ pub fn lex(code: String) -> Vec<Token> {
 		}
 	}
 	
-	tokens
+	Ok(tokens)
 }

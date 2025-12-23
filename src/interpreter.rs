@@ -1,5 +1,4 @@
 use std::mem::discriminant;
-use std::process::exit;
 use std::collections::HashMap;
 
 use crate::expr::{Sign, Expr, Type};
@@ -43,41 +42,37 @@ pub struct Interpreter {
 
 impl Interpreter {
 	pub fn new() -> Self {
-		return Interpreter {
+		Interpreter {
 			scopes: Vec::new(),
 		}
 	}
-	pub fn get_scope(self: &mut Self) -> &mut Scope {
-		return self.scopes.last_mut().unwrap()
+	pub fn get_scope(&mut self) -> &mut Scope {
+		self.scopes.last_mut().unwrap()
 	}
-	pub fn get_var(self: &Self, ident: String) -> Result<&Variable, String> {
+	pub fn get_var(&self, ident: String) -> Result<&Variable, String> {
 		let scope_len = self.scopes.len();
 		for i in 0..scope_len {
-			match self.scopes[(scope_len - 1) - i].variables.get(&ident) {
-				Some(var) => return Ok(var),
-				None => ()
+			if let Some(var) = self.scopes[(scope_len - 1) - i].variables.get(&ident) {
+				return Ok(var)
 			};
 		}
 		Err(format!("Variable {} is not initialized.", ident))
 	}
-	pub fn set_var(self: &mut Self, ident: String, value: Value) -> Result<(), String> {
+	pub fn set_var(&mut self, ident: String, value: Value) -> Result<(), String> {
 		let value_type = Type::from_value(value.clone());
 		let scope_len = self.scopes.len();
 		for i in 0..scope_len {
-			match self.scopes[(scope_len - 1) - i].variables.get_mut(&ident) {
-				Some(var) => {
+			if let Some(var) = self.scopes[(scope_len - 1) - i].variables.get_mut(&ident) {
 					if discriminant(&var.var_type) != discriminant(&value_type) {
 						return Err(format!("Implicit conversion from {:?} to {:?} is not supported", var.var_type, value_type))
 					}
 					var.value = value;
 					return Ok(());
-				},
-				None => ()
-			};
+				};
 		}
-		return Err(format!("Could not set the value of {}", ident));
+		Err(format!("Could not set the value of {}", ident))
 	}
-	pub fn init_var(self: &mut Self, ident: String, value: Value, var_type: Type) -> Result<(), String> {
+	pub fn init_var(&mut self, ident: String, value: Value, var_type: Type) -> Result<(), String> {
 		self.get_scope().variables.insert(ident, Variable::new(value.clone(), match var_type == Type::Auto {
 			true => Ok(Type::from_value(value)),
 			false => {
@@ -101,18 +96,18 @@ pub fn eval_expr(expr: Expr, ctx: &Interpreter) -> Result<Value, String> {
 		Expr::Bool(boollit) => Ok(Value::_Bool(boollit)),
 		Expr::Not(expr2) => {
 			let Value::_Bool(value) = eval_expr(*expr2, ctx)? else {
-				return Err(format!("Expected bool after !"));
+				return Err(String::from("Expected bool after !"));
 			};
 			
 			Ok(Value::_Bool(!value))
 		}
 		
-		Expr::SumExpr { sign, summands } => {
+		Expr::Sum { sign, summands } => {
 			let left  = eval_expr(summands[0].clone(), ctx)?;
 			let right = eval_expr(summands[1].clone(), ctx)?;
 			
 			if sign == Sign::Equal {
-				return Ok(Value::_Bool(left == right));
+				Ok(Value::_Bool(left == right))
 			} else if discriminant(&left) == discriminant(&right) {
 				match (left, right) {
 					(Value::_String(lstr), Value::_String(rstr)) => {
@@ -164,14 +159,14 @@ fn truthy(value: Value) -> bool {
 	}
 }
 
-pub fn run_code(ctx: &mut Interpreter, nodes: Vec<Node>) -> Result<(), String> {
+pub fn run_code(ctx: &mut Interpreter, nodes: Vec<Node>) -> Result<i32, String> {
 	ctx.scopes.push(Scope::new());
 	let mut current: usize = 0;
 	
 	while current < nodes.len() {
 		match nodes[current].clone() {
 			Node::Print(printexpr) => {
-				let value = eval_expr(printexpr, &ctx)?;
+				let value = eval_expr(printexpr, ctx)?;
 				match value {
 					Value::_String(str_to_print) => {
 						println!("{}", str_to_print);
@@ -185,14 +180,14 @@ pub fn run_code(ctx: &mut Interpreter, nodes: Vec<Node>) -> Result<(), String> {
 				}
 			},
 			Node::Exit(exitexpr) => {
-				let value = eval_expr(exitexpr, &ctx)?;
+				let value = eval_expr(exitexpr, ctx)?;
 				match value {
 					Value::_Int(exit_code) => {
 						println!("Program exited with code {}", exit_code);
-						exit(exit_code as i32);
+						return Ok(exit_code as i32);
 					},
 					Value::_Bool(exit_code) => {
-						exit(!exit_code as i32);
+						return Ok(exit_code as i32);
 					}
 					_ => {
 						panic!("Exit code must be an Int");
@@ -230,5 +225,5 @@ pub fn run_code(ctx: &mut Interpreter, nodes: Vec<Node>) -> Result<(), String> {
 	}
 	
 	ctx.scopes.pop();
-	Ok(())
+	Ok(0)
 }

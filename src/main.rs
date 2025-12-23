@@ -2,6 +2,7 @@ mod lexer;
 mod parser;
 mod interpreter;
 mod expr;
+mod tests;
 
 use std::fs;
 
@@ -21,11 +22,11 @@ fn main() -> Result<(), String> {
 	
 	let file = fs::read_to_string(args.file.clone()).unwrap();
 	
-	let tokens = lexer::lex(file);
+	let tokens = lexer::lex(file)?;
 	
 	println!("TOKENS: {:?}", &tokens);
 	
-	let mut parser_ctx = ParserContext { tokens, i: 0 };
+	let mut parser_ctx = ParserContext::new(tokens);
 	
 	let nodes = parser::parse(&mut parser_ctx, 0)?;
 	
@@ -35,5 +36,8 @@ fn main() -> Result<(), String> {
 	
 	println!();
 	
-	interpreter::run_code(&mut interpreter_ctx, nodes)
+	let exit_code = interpreter::run_code(&mut interpreter_ctx, nodes)?;
+	
+	println!("Program returned with code {}", exit_code);
+	Ok(())
 }
