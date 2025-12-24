@@ -4,10 +4,7 @@ use crate::parser::ParserContext;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expr {
-	Sum {
-		sign: Sign,
-		summands: Vec<Expr>
-	},
+	Sum { sign: Sign, summands: Vec<Expr> },
 	StringLit(String),
 	Int(i64),
 	Bool(bool),
@@ -21,7 +18,7 @@ pub enum Type {
 	String,
 	Bool,
 	Any,
-	Auto
+	Auto,
 }
 
 impl Type {
@@ -31,14 +28,14 @@ impl Type {
 			Token::TypeInt => Ok(Type::Int),
 			Token::TypeBool => Ok(Type::Bool),
 			Token::TypeAny => Ok(Type::Any),
-			_ => Err(format!("Expected type, but got {:?}", token))
+			_ => Err(format!("Expected type, but got {:?}", token)),
 		}
 	}
 	pub fn from_value(value: Value) -> Self {
 		match value {
 			Value::_String(_) => Type::String,
 			Value::_Int(_) => Type::Int,
-			Value::_Bool(_) => Type::Bool
+			Value::_Bool(_) => Type::Bool,
 		}
 	}
 }
@@ -58,28 +55,36 @@ type Precedence = i8;
 impl Sign {
 	pub fn from_token(token: &Token) -> Result<Self, String> {
 		match *token {
-			Token::Plus      => Ok(Sign::Add),
-			Token::Dash      => Ok(Sign::Subtract),
-			Token::Star      => Ok(Sign::Multiply),
-			Token::Slash     => Ok(Sign::Divide),
+			Token::Plus => Ok(Sign::Add),
+			Token::Dash => Ok(Sign::Subtract),
+			Token::Star => Ok(Sign::Multiply),
+			Token::Slash => Ok(Sign::Divide),
 			Token::Semicolon => Ok(Sign::Concat),
-			Token::Equals    => Ok(Sign::Equal),
-			
-			_                => Err(format!("Expected sign, but got {:?}", token))
+			Token::Equals => Ok(Sign::Equal),
+
+			_ => Err(format!("Expected sign, but got {:?}", token)),
 		}
 	}
 	pub fn get_precedence(&self) -> Precedence {
 		match self {
-			Sign::Add      => 1,
+			Sign::Add => 1,
 			Sign::Subtract => 1,
 			Sign::Multiply => 2,
-			Sign::Divide   => 2,
-			Sign::Concat   => 1,
-			Sign::Equal    => 2
+			Sign::Divide => 2,
+			Sign::Concat => 1,
+			Sign::Equal => 2,
 		}
 	}
 	pub fn is_sign(token: &Token) -> bool {
-		matches!(token, Token::Plus|Token::Dash|Token::Star|Token::Slash|Token::Semicolon|Token::Equals)
+		matches!(
+			token,
+			Token::Plus
+				| Token::Dash
+				| Token::Star
+				| Token::Slash
+				| Token::Semicolon
+				| Token::Equals
+		)
 	}
 }
 
@@ -88,10 +93,16 @@ pub fn parse_expr(ctx: &mut ParserContext) -> Result<Expr, String> {
 	parse_expr_1(ctx, primary, 0)
 }
 
-pub fn parse_expr_1(ctx: &mut ParserContext, lhs: Expr, min_precedence: Precedence) -> Result<Expr, String> {
+pub fn parse_expr_1(
+	ctx: &mut ParserContext,
+	lhs: Expr,
+	min_precedence: Precedence,
+) -> Result<Expr, String> {
 	let mut lookahead = match ctx.peek(0) {
 		Ok(token) => token,
-		Err(_) => {return Ok(lhs);}
+		Err(_) => {
+			return Ok(lhs);
+		}
 	};
 	if !Sign::is_sign(&lookahead) {
 		return Ok(lhs);
@@ -99,47 +110,55 @@ pub fn parse_expr_1(ctx: &mut ParserContext, lhs: Expr, min_precedence: Preceden
 	let mut expr = lhs.clone();
 	while match Sign::is_sign(&lookahead) {
 		true => Sign::from_token(&lookahead).unwrap().get_precedence() >= min_precedence,
-		false => false
+		false => false,
 	} {
 		let op = Sign::from_token(&lookahead)?;
 		ctx.next_token()?;
 		let mut rhs = parse_primary(ctx)?;
-		
+
 		lookahead = ctx.peek(0)?;
 		while match Sign::is_sign(&lookahead) {
 			true => Sign::from_token(&lookahead).unwrap().get_precedence() > op.get_precedence(),
-			false => false
+			false => false,
 		} {
-			rhs = parse_expr_1(ctx, rhs, op.get_precedence() + 
-						match Sign::from_token(&lookahead).unwrap().get_precedence() > op.get_precedence() {
-							true => 1,
-							false => 0
-						})?;
+			rhs = parse_expr_1(
+				ctx,
+				rhs,
+				op.get_precedence()
+					+ match Sign::from_token(&lookahead).unwrap().get_precedence()
+						> op.get_precedence()
+					{
+						true => 1,
+						false => 0,
+					},
+			)?;
 			lookahead = ctx.peek(0)?;
 		}
-		expr = Expr::Sum { sign: op, summands: vec!(expr, rhs) };
+		expr = Expr::Sum {
+			sign: op,
+			summands: vec![expr, rhs],
+		};
 	}
 	Ok(expr)
 }
 
-
-pub fn parse_primary(ctx: &mut ParserContext,) -> Result<Expr, String> {
+pub fn parse_primary(ctx: &mut ParserContext) -> Result<Expr, String> {
 	let token = ctx.next_token()?;
 	match token {
 		Token::StringLit(strlit) => Ok(Expr::StringLit(strlit)),
-		Token::IntLit(intlit)    => Ok(Expr::Int(intlit)),
-		Token::False             => Ok(Expr::Bool(false)),
-		Token::True              => Ok(Expr::Bool(true)),
-		Token::Bang              => {
+		Token::IntLit(intlit) => Ok(Expr::Int(intlit)),
+		Token::False => Ok(Expr::Bool(false)),
+		Token::True => Ok(Expr::Bool(true)),
+		Token::Bang => {
 			let expr = parse_primary(ctx)?;
 			Ok(Expr::Not(Box::new(expr)))
 		}
-		Token::Ident(ident)      => Ok(Expr::Ident(ident)),
+		Token::Ident(ident) => Ok(Expr::Ident(ident)),
 		Token::OpenParen => {
 			let expr = parse_expr(ctx);
 			ctx.expect_token(Token::CloseParen)?;
 			expr
-		},
-		_ => Err(format!("Expected expression, got {:?}", token))
+		}
+		_ => Err(format!("Expected expression, got {:?}", token)),
 	}
 }
