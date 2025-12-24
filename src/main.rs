@@ -38,6 +38,9 @@ fn main() -> Result<(), String> {
 
 	interpreter::run_code(&mut interpreter_ctx, nodes)?;
 
-	println!("Exit code: {}",interpreter_ctx.exit_code.or(Some(0)).unwrap());
+	println!(
+		"Exit code: {}",
+		interpreter_ctx.exit_code.unwrap_or(0)
+	);
 	Ok(())
 }

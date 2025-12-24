@@ -55,7 +55,7 @@ impl ParserContext {
 		if self.check_token(token.clone()) {
 			Ok(self.next_token()?)
 		} else {
-			Err(format!("Expected {:?}, but got {:?}", token, self.peek(0)))
+			Err(format!("Expected {:?}, but got {:?}", token, self.peek(0)?))
 		}
 	}
 
@@ -70,15 +70,11 @@ pub fn parse(ctx: &mut ParserContext, scope: usize) -> Result<Vec<Node>, String>
 	while ctx.i < ctx.tokens.len() {
 		let node = match ctx.next_token()? {
 			Token::Print => {
-				ctx.expect_token(Token::OpenParen)?;
 				let expr = parse_expr(ctx)?;
-				ctx.expect_token(Token::CloseParen)?;
 				Ok(Node::Print(expr))
 			}
 			Token::Exit => {
-				ctx.expect_token(Token::OpenParen)?;
 				let expr = parse_expr(ctx)?;
-				ctx.expect_token(Token::CloseParen)?;
 				Ok(Node::Exit(expr))
 			}
 

@@ -1,5 +1,6 @@
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum Token {
+	#[default]
 	None,
 	Print,
 	Exit,
@@ -59,7 +60,10 @@ impl LexerContext {
 
 fn lex_keyword(ctx: &mut LexerContext) -> Result<Token, String> {
 	let mut keyword = Vec::<u8>::new();
-	while (ctx.peek(0)? as char).is_alphanumeric() {
+	while match ctx.peek(0) {
+		Ok(c) => c.is_ascii_alphabetic(),
+		Err(_) => false
+	} {
 		keyword.push(ctx.next()?);
 	}
 	Ok(match keyword.as_slice() {
@@ -88,7 +92,10 @@ fn lex_string(ctx: &mut LexerContext) -> Result<String, String> {
 
 fn lex_int(ctx: &mut LexerContext) -> Result<i64, String> {
 	let mut s = Vec::<u8>::new();
-	while ctx.peek(0)?.is_ascii_digit() {
+	while match ctx.peek(0) {
+		Ok(c) => c.is_ascii_digit(),
+		Err(_) => false
+	} {
 		s.push(ctx.peek(0)?);
 		ctx.idx += 1;
 	}
@@ -98,7 +105,7 @@ fn lex_int(ctx: &mut LexerContext) -> Result<i64, String> {
 	println!("{:?}", r);
 	r.or(Err(format!(
 		"Could not parse string {} into Int",
-		String::from_utf8(s).or(Err(String::from("What")))?
+		String::from_utf8(s).or(Err(String::from("This should never happen.")))?
 	)))
 }
 

@@ -37,7 +37,7 @@ impl Variable {
 
 pub struct Interpreter {
 	scopes: Vec<Scope>,
-	pub output: Box<String>,
+	pub output: String,
 	pub exit_code: Option<i32>,
 }
 
@@ -45,7 +45,7 @@ impl Interpreter {
 	pub fn new() -> Self {
 		Interpreter {
 			scopes: Vec::new(),
-			output: Box::new(String::from("")),
+			output: String::from(""),
 			exit_code: None,
 		}
 	}
@@ -168,17 +168,18 @@ pub fn run_code(ctx: &mut Interpreter, nodes: Vec<Node>) -> Result<(), String> {
 				let value = eval_expr(printexpr, ctx)?;
 				match value {
 					Value::_String(str_to_print) => {
-						*ctx.output = *ctx.output.clone() + str_to_print.as_str() + "\n";
+						ctx.output += str_to_print.as_str();
+						ctx.output += "\n";
 						println!("{}", str_to_print);
 					}
 					Value::_Int(int_to_print) => {
 						ctx.output.push_str(int_to_print.to_string().as_str());
-						*ctx.output = *ctx.output.clone() + "\n";
+						ctx.output += "\n";
 						println!("{}", int_to_print);
 					}
 					Value::_Bool(bool_to_print) => {
 						ctx.output.push_str(bool_to_print.to_string().as_str());
-						*ctx.output = *ctx.output.clone() + "\n";
+						ctx.output += "\n";
 						println!("{}", bool_to_print);
 					}
 				}

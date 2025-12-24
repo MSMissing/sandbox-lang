@@ -98,6 +98,7 @@ pub fn parse_expr_1(
 	lhs: Expr,
 	min_precedence: Precedence,
 ) -> Result<Expr, String> {
+	// thanks Wikipedia
 	let mut lookahead = match ctx.peek(0) {
 		Ok(token) => token,
 		Err(_) => {
@@ -106,7 +107,7 @@ pub fn parse_expr_1(
 	};
 	if !Sign::is_sign(&lookahead) {
 		return Ok(lhs);
-	};
+	}
 	let mut expr = lhs.clone();
 	while match Sign::is_sign(&lookahead) {
 		true => Sign::from_token(&lookahead).unwrap().get_precedence() >= min_precedence,
@@ -116,7 +117,7 @@ pub fn parse_expr_1(
 		ctx.next_token()?;
 		let mut rhs = parse_primary(ctx)?;
 
-		lookahead = ctx.peek(0)?;
+		lookahead = ctx.peek(0).unwrap_or_default();
 		while match Sign::is_sign(&lookahead) {
 			true => Sign::from_token(&lookahead).unwrap().get_precedence() > op.get_precedence(),
 			false => false,
@@ -132,7 +133,7 @@ pub fn parse_expr_1(
 						false => 0,
 					},
 			)?;
-			lookahead = ctx.peek(0)?;
+			lookahead = ctx.peek(0).unwrap_or_default();
 		}
 		expr = Expr::Sum {
 			sign: op,
